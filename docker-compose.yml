@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  database:
+    image: postgres:15-alpine
+    container_name: quantum-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: quantum_secure_password_change_me
+      POSTGRES_DB: quantum_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    expose:
+      - "5432"
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: quantum-web
+    restart: always
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://postgres:quantum_secure_password_change_me@database:5432/quantum_db
+      NODE_ENV: production
+      PORT: 3000
+      NEXT_PUBLIC_SUPABASE_URL: "" # Forzar modo local mock para autenticación
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: ""
+      # RESEND_API_KEY: "tu_api_key_aqui" # Configurar para correos
+      # SII_CERT_B64: "" # Configurar si se emiten boletas
+      # SII_CERT_PASS: ""
+    depends_on:
+      - database
+    volumes:
+      - quantum_storage:/app/public/storage
+
+volumes:
+  postgres_data:
+  quantum_storage:

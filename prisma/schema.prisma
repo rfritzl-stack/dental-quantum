@@ -1,0 +1,318 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Paciente {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  rut                   String    @unique
+  nombre                String?
+  apellido              String?
+  email                 String?
+  telefono              String?
+  fecha_nacimiento      DateTime? @db.Date
+  sexo                  String?
+  direccion             String?
+  prevision             String?
+  seguro_complementario String?
+  notas_generales       String?
+  activo                Boolean   @default(true)
+  creado_en             DateTime  @default(now()) @db.Timestamptz
+  actualizado_en        DateTime? @updatedAt @db.Timestamptz
+
+  // Relations
+  agendas               Agenda[]
+  tratamientos          Tratamiento[]
+  cobros                Cobro[]
+  archivos              Archivo[]
+  formularios_generados FormularioGenerado[]
+
+  @@map("dq_pacientes")
+}
+
+model Profesional {
+  id                   String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre               String
+  apellido             String
+  especialidades       String[]
+  email                String    @unique
+  calendario_google_id String?
+  color_agenda         String?
+  activo               Boolean   @default(true)
+  horario_base         Json?
+  creado_en            DateTime  @default(now()) @db.Timestamptz
+
+  // Relations
+  agendas               Agenda[]
+  tratamientos          Tratamiento[]
+  archivos              Archivo[]
+  formularios_seguros   FormularioSeguro[]
+  formularios_generados FormularioGenerado[]
+  audit_logs            AuditLog[]
+  bloqueos              Bloqueo[]
+
+  @@map("dq_profesionales")
+}
+
+model Especialidad {
+  id                String  @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre            String
+  slug              String  @unique
+  descripcion       String?
+  descripcion_larga String?
+  duracion_minutos  Int
+  precio_base       Int
+  icono_slug        String?
+  activa            Boolean @default(true)
+  orden             Int     @default(0)
+
+  // Relations
+  agendas      Agenda[]
+  tratamientos Tratamiento[]
+
+  @@map("dq_especialidades")
+}
+
+model Agenda {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paciente_id       String   @db.Uuid
+  profesional_id    String   @db.Uuid
+  especialidad_id   String   @db.Uuid
+  fecha_hora_inicio DateTime @db.Timestamptz
+  fecha_hora_fin    DateTime @db.Timestamptz
+  estado            String   // 'pendiente','confirmada','en_curso','realizada','cancelada','no_show'
+  motivo_consulta   String?
+  notas_recepcion   String?
+  google_event_id   String?
+  creado_en         DateTime @default(now()) @db.Timestamptz
+  actualizado_en    DateTime @updatedAt @db.Timestamptz
+
+  // Relations
+  paciente     Paciente     @relation(fields: [paciente_id], references: [id])
+  profesional  Profesional  @relation(fields: [profesional_id], references: [id])
+  especialidad Especialidad @relation(fields: [especialidad_id], references: [id])
+  sesiones     Sesion[]
+  cobros       Cobro[]
+  whatsapp_list WhatsappLista[]
+
+  @@map("dq_agendas")
+}
+
+model Tratamiento {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paciente_id         String    @db.Uuid
+  profesional_id      String    @db.Uuid
+  especialidad_id     String    @db.Uuid
+  nombre_tratamiento  String
+  descripcion         String?
+  fecha_inicio        DateTime? @db.Date
+  fecha_fin_estimada  DateTime? @db.Date
+  sesiones_estimadas  Int
+  sesiones_realizadas Int       @default(0)
+  estado              String    // 'diagnostico','plan_aprobado','en_proceso','mantenimiento','completado','suspendido'
+  plan_detalle        Json?
+  costo_total         Int
+  creado_en           DateTime  @default(now()) @db.Timestamptz
+
+  // Relations
+  paciente     Paciente     @relation(fields: [paciente_id], references: [id])
+  profesional  Profesional  @relation(fields: [profesional_id], references: [id])
+  especialidad Especialidad @relation(fields: [especialidad_id], references: [id])
+  sesiones     Sesion[]
+  cobros       Cobro[]
+  archivos     Archivo[]
+
+  @@map("dq_tratamientos")
+}
+
+model Sesion {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tratamiento_id String   @db.Uuid
+  agenda_id      String   @db.Uuid
+  numero_sesion  Int
+  notas_clinicas String?
+  hallazgos      String?
+  proxima_accion String?
+  fecha_registro DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  tratamiento Tratamiento @relation(fields: [tratamiento_id], references: [id])
+  agenda      Agenda      @relation(fields: [agenda_id], references: [id])
+
+  @@map("dq_sesiones")
+}
+
+model Cobro {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paciente_id       String    @db.Uuid
+  agenda_id         String?   @db.Uuid
+  tratamiento_id    String?   @db.Uuid
+  concepto          String
+  monto             Int
+  metodo_pago       String    // 'pos_fisico','transferencia','efectivo','seguro'
+  estado            String    // 'pendiente','pagado','anulado'
+  folio_boleta      String?
+  numero_boleta_sii String?
+  fecha_emision     DateTime? @db.Timestamptz
+  datos_pos         Json?
+  creado_en         DateTime  @default(now()) @db.Timestamptz
+
+  // Relations
+  paciente     Paciente     @relation(fields: [paciente_id], references: [id])
+  agenda       Agenda?      @relation(fields: [agenda_id], references: [id])
+  tratamiento  Tratamiento? @relation(fields: [tratamiento_id], references: [id])
+  boletas_sii  BoletaSii[]
+  formularios_generados FormularioGenerado[]
+
+  @@map("dq_cobros")
+}
+
+model BoletaSii {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  cobro_id              String    @db.Uuid
+  rut_emisor            String
+  rut_receptor          String
+  razon_social_receptor String?
+  folio                 Int
+  tipo_dte              Int       @default(39)
+  monto_neto            Int
+  iva                   Int
+  monto_total           Int
+  xml_sii               String?
+  pdf_url               String?
+  estado_sii            String?
+  timbre                String?
+  fecha_emision         DateTime  @db.Timestamptz
+  creado_en             DateTime  @default(now()) @db.Timestamptz
+
+  // Relations
+  cobro Cobro @relation(fields: [cobro_id], references: [id])
+
+  @@map("dq_boletas_sii")
+}
+
+model Archivo {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  paciente_id    String   @db.Uuid
+  tratamiento_id String?  @db.Uuid
+  tipo           String   // 'radiografia','fotografia','consentimiento','documento','resultado'
+  url_storage    String
+  nombre_archivo String
+  descripcion    String?
+  subido_por     String   @db.Uuid
+  fecha_subida   DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  paciente    Paciente    @relation(fields: [paciente_id], references: [id])
+  tratamiento Tratamiento? @relation(fields: [tratamiento_id], references: [id])
+  profesional Profesional @relation(fields: [subido_por], references: [id])
+
+  @@map("dq_archivos")
+}
+
+model FormularioSeguro {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  aseguradora       String
+  nombre_formulario String
+  version           String?
+  pdf_template_url  String
+  campos_mapeados   Json?
+  activo            Boolean  @default(true)
+  subido_por        String   @db.Uuid
+  fecha_subida      DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  profesional           Profesional          @relation(fields: [subido_por], references: [id])
+  formularios_generados FormularioGenerado[]
+
+  @@map("dq_formularios_seguros")
+}
+
+model FormularioGenerado {
+  id                String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  formulario_id     String   @db.Uuid
+  paciente_id       String   @db.Uuid
+  cobro_id          String?  @db.Uuid
+  datos_completados Json?
+  pdf_generado_url  String?
+  estado            String   // 'borrador','completo','enviado'
+  creado_por        String   @db.Uuid
+  creado_en         DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  formulario FormularioSeguro @relation(fields: [formulario_id], references: [id])
+  paciente   Paciente         @relation(fields: [paciente_id], references: [id])
+  cobro      Cobro?           @relation(fields: [cobro_id], references: [id])
+  creador    Profesional      @relation(fields: [creado_por], references: [id])
+
+  @@map("dq_formularios_generados")
+}
+
+model WhatsappLista {
+  id                String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  agenda_id         String    @db.Uuid
+  paciente_nombre   String
+  paciente_telefono String
+  mensaje_generado  String?
+  fecha_cita        DateTime  @db.Date
+  estado_envio      String    @default("pendiente")
+  enviado_en        DateTime? @db.Timestamptz
+  creado_en         DateTime  @default(now()) @db.Timestamptz
+
+  // Relations
+  agenda Agenda @relation(fields: [agenda_id], references: [id])
+
+  @@map("dq_whatsapp_lista")
+}
+
+model Lead {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nombre              String
+  email               String?
+  telefono            String?
+  especialidad_interes String?
+  mensaje             String?
+  origen              String?
+  estado              String   @default("nuevo") // 'nuevo', etc.
+  notas               String?
+  creado_en           DateTime @default(now()) @db.Timestamptz
+
+  @@map("dq_leads")
+}
+
+model AuditLog {
+  id              String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  usuario_id      String?  @db.Uuid
+  accion          String
+  tabla_afectada  String
+  registro_id     String?  @db.Uuid
+  datos_anteriores Json?
+  datos_nuevos    Json?
+  ip              String?
+  creado_en       DateTime @default(now()) @db.Timestamptz
+
+  // Relations
+  profesional Profesional? @relation(fields: [usuario_id], references: [id])
+
+  @@map("dq_audit_log")
+}
+
+model Bloqueo {
+  id             String      @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  profesional_id String      @db.Uuid
+  fecha_inicio   DateTime    @db.Timestamptz
+  fecha_fin      DateTime    @db.Timestamptz
+  motivo         String?
+
+  // Relations
+  profesional    Profesional @relation(fields: [profesional_id], references: [id])
+
+  @@map("dq_bloqueos")
+}
