@@ -21,7 +21,7 @@ services:
     container_name: quantum-web
     restart: always
     ports:
-      - "3000:3000"
+      - "3050:3000"
     environment:
       DATABASE_URL: postgresql://postgres:quantum_secure_password_change_me@database:5432/quantum_db
       NODE_ENV: production
